@@ -1,19 +1,19 @@
 # crap4bash
 
-`crap4bash` calculates CRAP scores for Bash functions. It uses a shell-aware lexer and reads kcov Cobertura XML or LCOV coverage.
-
-## Install
+`crap4bash` calculates function-level CRAP scores for Bash source with a Tree-sitter syntax tree and executable-line coverage. Missing coverage is an error by default.
 
 ```bash
 pipx install git+https://github.com/lukasa1993/crap4bash.git
+crap4bash --fail-over 6
 ```
 
-## Run
+Supported coverage inputs: LCOV, Cobertura XML, coverage.py JSON, Istanbul JSON, and LLVM export JSON. Use `--no-test` to analyze an existing report. Use `--allow-missing-coverage` only for exploratory work.
+
+Exit status: `0` pass, `1` configuration/execution/coverage error, `2` quality limit failure.
+
+## Development
 
 ```bash
-crap4bash --test-command "kcov target/coverage bats tests" --coverage target/coverage --fail-over 6
+python -m pip install -e . pytest
+pytest -q
 ```
-
-The coverage path can be a report file or a directory. The tool searches a directory for `cobertura.xml` or `lcov.info`.
-
-Use `--no-test` for an existing report and `--json` for machine-readable output.
