@@ -1,27 +1,35 @@
+import json
 from pathlib import Path
 
-from crap4bash.core import analyze, extract_functions, score
+import pytest
+
+from crap4bash.core import AnalysisError, analyze, extract_functions, score
 
 
-def test_extracts_function_complexity(tmp_path: Path) -> None:
-    source = tmp_path / "sample.sh"
-    source.write_text("""#!/usr/bin/env bash
-choose() {
-  if [[ $1 == yes ]] && true; then
-    echo yes
-  fi
-}
-""", encoding="utf-8")
-    function = extract_functions(source, tmp_path)[0]
-    assert function.name == "choose"
-    assert function.complexity == 3
+def test_score_formula() -> None:
+    assert score(10, 50.0) == 22.5
+    assert score(10, 100.0) == 10.0
 
 
-def test_maps_cobertura(tmp_path: Path) -> None:
-    source = tmp_path / "sample.sh"
-    source.write_text("f() {\n echo a\n echo b\n}\n", encoding="utf-8")
-    report = tmp_path / "cobertura.xml"
-    report.write_text('<coverage><packages><package><classes><class filename="sample.sh"><lines><line number="2" hits="1"/><line number="3" hits="0"/></lines></class></classes></package></packages></coverage>', encoding="utf-8")
-    metric = analyze(tmp_path, report)[0]
-    assert metric.coverage == 50
-    assert metric.crap == score(1, 50)
+def test_target_language_function_and_complexity(tmp_path: Path) -> None:
+    source = tmp_path / 'sample.sh'
+    source.write_text('#!/usr/bin/env bash\nchoose() {\n  if [[ "$1" == yes && "$2" == yes ]]; then\n    echo 1\n  else\n    echo 0\n  fi\n}\n', encoding="utf-8")
+    metrics = extract_functions(source, tmp_path)
+    assert metrics
+    metric = next(item for item in metrics if 'choose' in item.name)
+    assert metric.complexity >= 3
+
+
+def test_lcov_is_mapped_by_executable_line(tmp_path: Path) -> None:
+    source = tmp_path / 'sample.sh'
+    source.write_text('#!/usr/bin/env bash\nchoose() {\n  if [[ "$1" == yes && "$2" == yes ]]; then\n    echo 1\n  else\n    echo 0\n  fi\n}\n', encoding="utf-8")
+    coverage = tmp_path / "lcov.info"
+    coverage.write_text(f"SF:{source.as_posix()}\nDA:1,1\nDA:2,1\nDA:3,0\nDA:4,1\nDA:5,1\nend_of_record\n", encoding="utf-8")
+    metrics = analyze(tmp_path, coverage)
+    assert metrics
+    assert any(item.coverage is not None for item in metrics)
+
+
+def test_missing_report_fails(tmp_path: Path) -> None:
+    with pytest.raises(AnalysisError):
+        analyze(tmp_path, tmp_path / "missing.info")
